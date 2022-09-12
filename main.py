@@ -6,7 +6,7 @@ import numpy as np
 
 from functools import partial
 from tkinter import *
-from tkinter.filedialog import asksaveasfile
+from tkinter.filedialog import asksaveasfile, askopenfile
 
 from matplotlib import pyplot as plt
 
@@ -27,7 +27,7 @@ class Entries:
         self.parent_window = parent_window
 
     # adding of new entry (добавление нового текстового поля)
-    def add_entry(self):
+    def add_entry(self, default_str = None):
         new_entry = Entry(self.parent_window)
 
         def on_entry_focused(*args, **kwargs):
@@ -36,6 +36,8 @@ class Entries:
         new_entry.bind('<FocusIn>', on_entry_focused)
         new_entry.icursor(0)
         new_entry.focus()
+        if default_str is not None:
+            new_entry.insert(0, default_str)
         new_entry.pack()
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
@@ -71,6 +73,13 @@ class Entries:
         no_button = Button(master=mw.top, text='Нет', command=on_click(False))
         mw.add_button(yes_button)
         mw.add_button(no_button)
+
+    def import_entries_state(self, list_of_function):
+        for entry in self.entries_list:
+            entry.pack_forget()
+        self.entries_list = []
+        for func in list_of_function:
+            self.add_entry(default_str=func)
 
 # class for plotting (класс для построения графиков)
 class Plotter:
@@ -148,16 +157,17 @@ class Commands:
         if self.__navigation_toolbar is not None:
             self.__navigation_toolbar.pack_forget()
 
-    def plot(self, *args, **kwargs):
-        def is_not_blank(s):
-            return bool(s and not s.isspace())
+    @staticmethod
+    def __is_not_blank(s):
+        return bool(s and not s.isspace())
 
+    def plot(self, *args, **kwargs):
         self._state.reset_state()
         list_of_function = []
         for entry in self.parent_window.entries.entries_list:
             get_func_str = entry.get()
             self._state.list_of_function.append(get_func_str)
-            if is_not_blank(get_func_str):
+            if Commands.__is_not_blank(get_func_str):
                 list_of_function.append(get_func_str)
             else:
                 if self.__empty_entry_counter == 0:
@@ -195,6 +205,25 @@ class Commands:
     def save_as(self):
         self._state.save_state()
         return self
+
+    def load_from(self):
+        filename = askopenfile()
+        if filename is None:
+            return
+        self._state.reset_state()
+        self._state.list_of_function = json.load(filename)['list_of_function']
+        self.parent_window.entries.import_entries_state(self._state.list_of_function)
+        list_of_functions = [func for func in self._state.list_of_function if Commands.__is_not_blank(func)]
+        figure = self.parent_window.plotter.plot(list_of_functions)
+        self._state.figure = figure
+        self.__forget_canvas()
+        self.__figure_canvas = FigureCanvasTkAgg(figure, self.parent_window)
+        self.__forget_navigation()
+        self.__navigation_toolbar = NavigationToolbar2Tk(self.__figure_canvas, self.parent_window)
+        self.__figure_canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        plot_button = self.parent_window.get_button_by_name('plot')
+        if plot_button:
+            plot_button.pack_forget()
 
 
 # class for buttons storage (класс для хранения кнопок)
@@ -270,6 +299,7 @@ class App(Tk):
 
         file_menu = Menu(menu)
         file_menu.add_command(label="Save as...", command=self.commands.get_command_by_name('save_as'))
+        file_menu.add_command(label="Load from...", command=self.commands.get_command_by_name('load_from'))
         menu.add_cascade(label="File", menu=file_menu)
 
 
@@ -288,6 +318,7 @@ if __name__ == "__main__":
     commands_main.add_command('add_func', commands_main.add_func)
     commands_main.add_command('delete_focused_func', commands_main.delete_focused_func)
     commands_main.add_command('save_as', commands_main.save_as)
+    commands_main.add_command('load_from', commands_main.load_from)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
