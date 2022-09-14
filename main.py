@@ -57,6 +57,11 @@ class Entries:
         self.focused_entry.pack_forget()
         self.entries_list.remove(self.focused_entry)
         self.focused_entry = None
+        # redrawing plot button
+        plot_button = self.parent_window.get_button_by_name('plot')
+        if plot_button:
+            plot_button.pack_forget()
+        self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
 
     def __modal_on_deleting_nonempty_entry(self):
         mw = ModalWindow(self.parent_window, title='Удаление непустой строки', labeltext='Удаляемая строка непуста, '
